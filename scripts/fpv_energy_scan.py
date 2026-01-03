@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 # Copyright 2025-2026 CEMAXECUTER LLC.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,12 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-#!/usr/bin/env python3
-# Proprietary and Confidential
-# Copyright (c) 2025-2026 CEMAXECUTER LLC.
-# All rights reserved. This source code is proprietary and is not licensed for distribution,
-# disclosure, or use beyond explicitly authorized recipients. No reproduction or redistribution
-# in whole or in part without prior written permission from CEMAXECUTER LLC.
 import argparse
 import gc
 import json

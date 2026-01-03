@@ -13,12 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Proprietary and Confidential
-# Copyright (c) 2025-2026 CEMAXECUTER LLC.
-# All rights reserved. This source code is proprietary and is not licensed for distribution,
-# disclosure, or use beyond explicitly authorized recipients. No reproduction or redistribution
-# in whole or in part without prior written permission from CEMAXECUTER LLC.
-
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
