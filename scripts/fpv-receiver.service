@@ -19,13 +19,12 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-WorkingDirectory=/home/dragon/WarDragon
+WorkingDirectory=/home/dragon/WarDragon/wardragon-fpv-detect
 Environment=FPV_DJI_GUARD=1
 Environment=FPV_DJI_GUARD_INTERVAL=30
-ExecStart=/home/dragon/WarDragon/scripts/fpv_energy_service.sh -z --zmq-endpoint tcp://127.0.0.1:4226
+ExecStart=/home/dragon/WarDragon/wardragon-fpv-detect/scripts/fpv_energy_service.sh -z --zmq-endpoint tcp://127.0.0.1:4226
 Restart=on-failure
 RestartSec=5
 
 [Install]
 WantedBy=multi-user.target
-
