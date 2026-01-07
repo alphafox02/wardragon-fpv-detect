@@ -79,6 +79,7 @@ SUSCLI_BANDWIDTH = "1.8e6"
 SUSCLI_DT = "0.1"
 SUSCLI_Q = "10"
 CONFIRM_SECONDS = 5
+CONFIRM_THRESHOLD = 60.0
 COOLDOWN_S = 1.0
 REOPEN_RETRIES = 5
 REOPEN_DELAY_S = 2.0
@@ -422,6 +423,12 @@ def parse_args():
         default=GAIN,
         help=f"RF gain (default: {GAIN}).",
     )
+    parser.add_argument(
+        "--confirm-threshold",
+        type=float,
+        default=CONFIRM_THRESHOLD,
+        help="Minimum PAL/NTSC confidence to publish confirm alerts (default: 60).",
+    )
     return parser.parse_args()
 
 
@@ -495,8 +502,16 @@ def main():
                         print(
                             f"confirm center={confirm_hz/1e6:.3f}MHz pal={pal:.1f} ntsc={ntsc:.1f}"
                         )
-                        if pub is not None:
-                            publish_alert(pub, confirm_hz, confirm_bw, pal, ntsc, "confirm")
+                        if max(pal, ntsc) >= args.confirm_threshold:
+                            if pub is not None:
+                                publish_alert(
+                                    pub, confirm_hz, confirm_bw, pal, ntsc, "confirm"
+                                )
+                        elif args.debug:
+                            print(
+                                "debug: confirm below threshold "
+                                f"({args.confirm_threshold:.1f})"
+                            )
                         if args.debug:
                             print(
                                 f"debug: confirm center={confirm_hz/1e6:.3f}MHz "
