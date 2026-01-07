@@ -79,6 +79,18 @@ python3 scripts/fpv_energy_scan.py --osmosdr-args "driver=soapy,soapy=hackrf" \
   --samp-rate 8e6 --bandwidth 8e6 --gain 20
 ```
 
+Use a different SDR via the service wrapper:
+
+```bash
+FPV_OSMOSDR_ARGS="soapy=driver=hackrf" ./scripts/fpv_energy_service.sh
+```
+
+Override the Pluto address used by the service wrapper:
+
+```bash
+FPV_PLUTO_URI="ant.local" ./scripts/fpv_energy_service.sh
+```
+
 ## Notes
 
 - The script stops GNURadio before running `suscli` confirm, then restarts it.

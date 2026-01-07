@@ -20,6 +20,8 @@ SERVICE_CTL="${ROOT_DIR}/scripts/service_controller.sh"
 SCAN_SCRIPT="${ROOT_DIR}/scripts/fpv_energy_scan.py"
 FPV_DJI_GUARD="${FPV_DJI_GUARD:-1}"
 FPV_DJI_GUARD_INTERVAL="${FPV_DJI_GUARD_INTERVAL:-30}"
+FPV_OSMOSDR_ARGS="${FPV_OSMOSDR_ARGS:-}"
+FPV_PLUTO_URI="${FPV_PLUTO_URI:-}"
 
 guard_pid=""
 
@@ -54,4 +56,12 @@ fi
 
 start_guard
 
-python3 "${SCAN_SCRIPT}" "$@"
+extra_args=()
+if [ -n "${FPV_OSMOSDR_ARGS}" ]; then
+  extra_args+=(--osmosdr-args "${FPV_OSMOSDR_ARGS}")
+fi
+if [ -n "${FPV_PLUTO_URI}" ]; then
+  extra_args+=(--pluto-uri "${FPV_PLUTO_URI}")
+fi
+
+python3 "${SCAN_SCRIPT}" "$@" "${extra_args[@]}"
