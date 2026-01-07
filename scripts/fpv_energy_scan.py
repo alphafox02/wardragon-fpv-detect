@@ -53,7 +53,7 @@ RACE_BANDS_ALL_MHZ = [
 EXTRA_59_MHZ = [5935, 5940, 5943, 5950]
 ALL_CENTERS_MHZ = sorted(set(RACE_BANDS_ALL_MHZ + EXTRA_59_MHZ))
 
-PLUTO_URI = "ip:ant.local"
+PLUTO_URI = "ant.local"
 SAMP_RATE = 8e6
 BANDWIDTH = 8e6
 GAIN = 50
@@ -403,7 +403,10 @@ def parse_args():
     parser.add_argument(
         "--pluto-uri",
         default=PLUTO_URI,
-        help=f"Pluto URI when using default args (default: {PLUTO_URI}).",
+        help=(
+            "Pluto address/URI when using default args "
+            f"(default: {PLUTO_URI}, examples: ant.local, ip:ant.local, usb:0.1.5)"
+        ),
     )
     parser.add_argument(
         "--samp-rate",
@@ -441,7 +444,7 @@ def main():
     if args.osmosdr_args:
         source_args = args.osmosdr_args
     else:
-        source_args = f"plutosdr=ip:{args.pluto_uri}"
+        source_args = f"soapy=driver=plutosdr,addr={args.pluto_uri}"
 
     tb = InspectorScan(threshold_db, source_args, args.samp_rate, args.bandwidth, args.gain)
     tb.start()
@@ -523,4 +526,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
