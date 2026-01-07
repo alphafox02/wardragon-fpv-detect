@@ -79,7 +79,7 @@ SUSCLI_BANDWIDTH = "1.8e6"
 SUSCLI_DT = "0.1"
 SUSCLI_Q = "10"
 CONFIRM_SECONDS = 5
-COOLDOWN_S = 3.0
+COOLDOWN_S = 1.0
 REOPEN_RETRIES = 5
 REOPEN_DELAY_S = 2.0
 
@@ -317,12 +317,8 @@ def run_confirm(center_hz):
 
     max_pal = 0.0
     max_ntsc = 0.0
-    skip_lines = 2
     for line in output.splitlines():
         if not line.startswith("{"):
-            continue
-        if skip_lines > 0:
-            skip_lines -= 1
             continue
         try:
             data = json.loads(line)
