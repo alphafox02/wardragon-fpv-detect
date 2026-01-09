@@ -35,6 +35,13 @@ ACTION="$1"
 
 # SSH options: bypass host key checking and do not update the known_hosts file.
 SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+VERBOSE="${FPV_DJI_GUARD_VERBOSE:-0}"
+
+log() {
+  if [ "$VERBOSE" = "1" ]; then
+    echo "$@"
+  fi
+}
 
 # Function: Stop the service by killing one or more target processes.
 stop_service() {
@@ -82,33 +89,45 @@ EOF
   # Make the temporary script executable.
   chmod +x "$LOCAL_TMP_SCRIPT"
 
-  echo "Copying kill script to remote host..."
-  sshpass -p "$PASSWORD" scp -O $SSH_OPTS "$LOCAL_TMP_SCRIPT" "$USER@$HOST:/tmp/remote_kill.sh"
+  log "Copying kill script to remote host..."
+  if [ "$VERBOSE" = "1" ]; then
+    sshpass -p "$PASSWORD" scp -O $SSH_OPTS "$LOCAL_TMP_SCRIPT" "$USER@$HOST:/tmp/remote_kill.sh"
+  else
+    sshpass -p "$PASSWORD" scp -O -q $SSH_OPTS "$LOCAL_TMP_SCRIPT" "$USER@$HOST:/tmp/remote_kill.sh" >/dev/null 2>&1
+  fi
 
-  echo "Executing remote kill script..."
-  sshpass -p "$PASSWORD" ssh -tt $SSH_OPTS "$USER@$HOST" "sh /tmp/remote_kill.sh; rm /tmp/remote_kill.sh"
+  log "Executing remote kill script..."
+  if [ "$VERBOSE" = "1" ]; then
+    sshpass -p "$PASSWORD" ssh -tt $SSH_OPTS "$USER@$HOST" "sh /tmp/remote_kill.sh; rm /tmp/remote_kill.sh"
+  else
+    sshpass -p "$PASSWORD" ssh -tt -q $SSH_OPTS "$USER@$HOST" "sh /tmp/remote_kill.sh; rm /tmp/remote_kill.sh" >/dev/null 2>&1
+  fi
 
   # Clean up the local temporary file.
   rm "$LOCAL_TMP_SCRIPT"
 
-  echo "Remote kill script executed."
+  log "Remote kill script executed."
 }
 
 # Function: Start the service using the remote init script, detached from the session.
 start_service() {
-  echo "Starting Drone Daemon on remote host..."
+  log "Starting Drone Daemon on remote host..."
   # Use nohup, background the command, and redirect output so the SSH session can disconnect.
-  sshpass -p "$PASSWORD" ssh $SSH_OPTS "$USER@$HOST" "nohup /etc/init.d/S55drone start > /dev/null 2>&1 &"
+  if [ "$VERBOSE" = "1" ]; then
+    sshpass -p "$PASSWORD" ssh $SSH_OPTS "$USER@$HOST" "nohup /etc/init.d/S55drone start > /dev/null 2>&1 &"
+  else
+    sshpass -p "$PASSWORD" ssh -q $SSH_OPTS "$USER@$HOST" "nohup /etc/init.d/S55drone start > /dev/null 2>&1 &" >/dev/null 2>&1
+  fi
 }
 
 # Main action selection.
 case "$ACTION" in
   stop)
-    echo "Executing stop command..."
+    log "Executing stop command..."
     stop_service
     ;;
   start)
-    echo "Executing start command..."
+    log "Executing start command..."
     start_service
     ;;
   *)

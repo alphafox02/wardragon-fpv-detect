@@ -22,8 +22,17 @@ FPV_DJI_GUARD="${FPV_DJI_GUARD:-1}"
 FPV_DJI_GUARD_INTERVAL="${FPV_DJI_GUARD_INTERVAL:-30}"
 FPV_OSMOSDR_ARGS="${FPV_OSMOSDR_ARGS:-}"
 FPV_PLUTO_URI="${FPV_PLUTO_URI:-}"
+FPV_DJI_GUARD_VERBOSE="${FPV_DJI_GUARD_VERBOSE:-0}"
 
 guard_pid=""
+
+for arg in "$@"; do
+  case "$arg" in
+    -d|--debug)
+      FPV_DJI_GUARD_VERBOSE=1
+      ;;
+  esac
+done
 
 start_guard() {
   if [ "${FPV_DJI_GUARD}" != "1" ]; then
