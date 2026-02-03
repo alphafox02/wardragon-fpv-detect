@@ -209,7 +209,7 @@ def poll_monitor_for_gps(sub_sock):
         _last_sensor_gps = (float(lat), float(lon), float(alt))
 
 
-def build_alert_messages(center_hz, bandwidth_hz, pal, ntsc, source):
+def build_alert_messages(center_hz, bandwidth_hz, pal, ntsc, rssi, source):
     message_list = []
     freq_mhz = center_hz / 1e6
     alert_id = f"{ALERT_ID_PREFIX}-{freq_mhz:.3f}MHz"
@@ -251,22 +251,25 @@ def build_alert_messages(center_hz, bandwidth_hz, pal, ntsc, source):
     }
     message_list.append(freq_msg)
 
-    signal_info = {
-        "Signal Info": {
-            "source": source,
-            "center_hz": center_hz,
-            "bandwidth_hz": bandwidth_hz,
-            "pal_conf": pal,
-            "ntsc_conf": ntsc,
-        }
+    # Signal Info with rssi for triangulation support
+    signal_info_data = {
+        "source": source,
+        "center_hz": center_hz,
+        "bandwidth_hz": bandwidth_hz,
+        "pal_conf": pal,
+        "ntsc_conf": ntsc,
     }
+    # Include rssi (dBm) for signal strength-based distance estimation
+    if rssi is not None:
+        signal_info_data["rssi"] = rssi
+    signal_info = {"Signal Info": signal_info_data}
     message_list.append(signal_info)
 
     return message_list
 
 
-def publish_alert(pub_socket, center_hz, bandwidth_hz, pal, ntsc, source):
-    message_list = build_alert_messages(center_hz, bandwidth_hz, pal, ntsc, source)
+def publish_alert(pub_socket, center_hz, bandwidth_hz, pal, ntsc, rssi, source):
+    message_list = build_alert_messages(center_hz, bandwidth_hz, pal, ntsc, rssi, source)
     try:
         pub_socket.send_string(json.dumps(message_list))
     except Exception:
@@ -275,7 +278,7 @@ def publish_alert(pub_socket, center_hz, bandwidth_hz, pal, ntsc, source):
 
 def run_confirm(center_hz):
     if _confirm_disabled_reason is not None:
-        return None, None
+        return None, None, None
     cmd = [
         SUSCLI_BIN,
         "fpvdet",
@@ -298,7 +301,7 @@ def run_confirm(center_hz):
         )
     except FileNotFoundError:
         _disable_confirm(f"{SUSCLI_BIN} not found in PATH")
-        return None, None
+        return None, None, None
     except subprocess.TimeoutExpired as exc:
         output = exc.stdout or b""
         if isinstance(output, bytes):
@@ -314,10 +317,11 @@ def run_confirm(center_hz):
         if proc.returncode != 0:
             if "Unknown command" in combined or "unknown command" in combined:
                 _disable_confirm("suscli fpvdet command not available")
-                return None, None
+                return None, None, None
 
     max_pal = 0.0
     max_ntsc = 0.0
+    max_rssi = None  # RSSI in dBm (negative values, higher = stronger)
     for line in output.splitlines():
         if not line.startswith("{"):
             continue
@@ -325,13 +329,20 @@ def run_confirm(center_hz):
             data = json.loads(line)
         except json.JSONDecodeError:
             continue
+        # Extract rssi from top level (signal strength in dBm)
+        rssi = data.get("rssi")
+        if rssi is not None:
+            rssi = float(rssi)
+            # Track max (strongest) rssi - less negative is stronger
+            if max_rssi is None or rssi > max_rssi:
+                max_rssi = rssi
         sig = data.get("signal", {})
         pal = float(sig.get("pal", 0.0))
         ntsc = float(sig.get("ntsc", 0.0))
         max_pal = max(max_pal, pal)
         max_ntsc = max(max_ntsc, ntsc)
 
-    return max_pal, max_ntsc
+    return max_pal, max_ntsc, max_rssi
 
 
 def start_tb_with_retry(threshold_db, source_args, samp_rate, bandwidth, gain):
@@ -485,7 +496,7 @@ def main():
                     )
                     print(f"center={mhz:.0f}MHz signals: {sig_str}")
                     if pub is not None:
-                        publish_alert(pub, confirm_hz, confirm_bw, 0.0, 0.0, "energy")
+                        publish_alert(pub, confirm_hz, confirm_bw, 0.0, 0.0, None, "energy")
 
                     # Confirm with suscli (release SDR first)
                     tb.stop()
@@ -493,19 +504,20 @@ def main():
                     tb = None
                     gc.collect()
                     time.sleep(COOLDOWN_S)
-                    pal, ntsc = run_confirm(confirm_hz)
+                    pal, ntsc, rssi = run_confirm(confirm_hz)
                     if pal is None or ntsc is None:
                         print(
                             f"confirm center={confirm_hz/1e6:.3f}MHz skipped (suscli unavailable)"
                         )
                     else:
+                        rssi_str = f" rssi={rssi:.1f}dBm" if rssi is not None else ""
                         print(
-                            f"confirm center={confirm_hz/1e6:.3f}MHz pal={pal:.1f} ntsc={ntsc:.1f}"
+                            f"confirm center={confirm_hz/1e6:.3f}MHz pal={pal:.1f} ntsc={ntsc:.1f}{rssi_str}"
                         )
                         if max(pal, ntsc) >= args.confirm_threshold:
                             if pub is not None:
                                 publish_alert(
-                                    pub, confirm_hz, confirm_bw, pal, ntsc, "confirm"
+                                    pub, confirm_hz, confirm_bw, pal, ntsc, rssi, "confirm"
                                 )
                         elif args.debug:
                             print(
@@ -515,7 +527,7 @@ def main():
                         if args.debug:
                             print(
                                 f"debug: confirm center={confirm_hz/1e6:.3f}MHz "
-                                f"bw={confirm_bw/1e6:.3f}MHz pal={pal:.1f} ntsc={ntsc:.1f}"
+                                f"bw={confirm_bw/1e6:.3f}MHz pal={pal:.1f} ntsc={ntsc:.1f}{rssi_str}"
                             )
                     time.sleep(COOLDOWN_S)
                     tb = start_tb_with_retry(
