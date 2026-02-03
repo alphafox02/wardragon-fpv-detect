@@ -19,6 +19,8 @@ Wants=network-online.target
 
 [Service]
 Type=simple
+User=dragon
+Group=dragon
 WorkingDirectory=/home/dragon/WarDragon/wardragon-fpv-detect
 Environment=FPV_DJI_GUARD=1
 Environment=FPV_DJI_GUARD_INTERVAL=30
