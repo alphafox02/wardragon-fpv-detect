@@ -36,6 +36,21 @@ Signal Info).
 - `WARD_MON_ZMQ`: monitor GPS endpoint
 - `WARD_MON_RECV_TIMEOUT_MS`: monitor recv timeout
 
+### DJI Guard (AntSDR)
+
+When using an AntSDR in DJI receiver mode, the service wrapper can SSH into the SDR to stop
+the DJI daemon before scanning (they share the same RF hardware).
+
+- `FPV_DJI_GUARD`: Set to `1` to enable SSH guard (default), `0` to disable
+- `FPV_DJI_GUARD_INTERVAL`: Seconds between guard checks (default: 30)
+- `FPV_DJI_GUARD_VERBOSE`: Set to `1` for verbose SSH output (set automatically with `-d`)
+
+Example to disable the DJI guard (if not using AntSDR DJI mode):
+
+```bash
+FPV_DJI_GUARD=0 ./scripts/fpv_energy_service.sh -z --zmq-endpoint tcp://127.0.0.1:4226
+```
+
 ## Running
 
 ```bash
@@ -54,10 +69,25 @@ Optional systemd unit:
 
 ```bash
 sudo cp scripts/fpv-receiver.service /etc/systemd/system/fpv-receiver.service
-sudo editor /etc/systemd/system/fpv-receiver.service
 sudo systemctl daemon-reload
 sudo systemctl start fpv-receiver
 ```
+
+**Important**: The service file includes `User=dragon` and `Group=dragon`. If your username
+is different, edit the service file before copying:
+
+```bash
+# Check your username
+whoami
+
+# Edit if needed (replace 'dragon' with your username)
+sed -i 's/dragon/yourusername/g' scripts/fpv-receiver.service
+sudo cp scripts/fpv-receiver.service /etc/systemd/system/
+sudo systemctl daemon-reload
+```
+
+The service **must run as your user** (not root) because `suscli` calibration profiles are
+stored in your home directory (`~/.config/suscan/`). Running as root will fail to find them.
 
 Enable ZMQ output and custom endpoints:
 
@@ -135,3 +165,59 @@ If you miss weak signals:
 If you see too many false positives:
 - Raise `THRESHOLD_OFFSET_DB` by 1–2 dB, or
 - Increase `MIN_BW_HZ` toward 6e6.
+
+## Signal Data Format
+
+The `suscli fpvdet` plugin outputs signal strength as **linear power** (magnitude², 0-1 scale),
+**not** dBm. This is important for downstream processing:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `rssi` | float | Linear power (0-1 scale, higher = stronger) |
+| `signal.pal` | float | PAL video confidence (0-100%) |
+| `signal.ntsc` | float | NTSC video confidence (0-100%) |
+
+**Note**: The `rssi` value cannot be converted to distance without SDR calibration. It's useful
+for relative signal strength comparisons (e.g., weighted triangulation with multiple kits) but
+not for absolute range estimation.
+
+## Troubleshooting
+
+### Service runs but no detections appear
+
+1. **Check user**: The service must run as your user, not root. Verify with:
+   ```bash
+   grep "User=" /etc/systemd/system/fpv-receiver.service
+   ```
+   Should show your username (e.g., `User=dragon`).
+
+2. **Check calibration**: Ensure your suscli profile exists:
+   ```bash
+   ls ~/.config/suscan/profiles/
+   ```
+   Should include `fpv58_race_2m` or your configured profile.
+
+3. **Test manually**: Run the script directly to see output:
+   ```bash
+   python3 scripts/fpv_energy_scan.py -z -d --zmq-endpoint tcp://127.0.0.1:4226
+   ```
+
+### SSH errors in service logs
+
+If using the DJI guard with AntSDR and seeing SSH failures:
+
+- **SDR not in DJI mode**: If your SDR firmware isn't running DJI services, disable the guard:
+  ```bash
+  # In the service file, add:
+  Environment=FPV_DJI_GUARD=0
+  ```
+
+- **SSH timeout/connection refused**: The guard will retry silently and continue scanning.
+  This is normal if the SDR is unreachable.
+
+### Script exits immediately
+
+Check for `set -e` failures. The service wrapper uses strict error handling. Common causes:
+- Missing dependencies (gr-inspector, suscli)
+- SDR not connected
+- Permission denied on SDR device (add user to `plugdev` group)
