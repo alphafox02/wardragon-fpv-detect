@@ -100,7 +100,8 @@ EOF
   if [ "$VERBOSE" = "1" ]; then
     sshpass -p "$PASSWORD" ssh -tt $SSH_OPTS "$USER@$HOST" "sh /tmp/remote_kill.sh; rm /tmp/remote_kill.sh"
   else
-    sshpass -p "$PASSWORD" ssh -tt -q $SSH_OPTS "$USER@$HOST" "sh /tmp/remote_kill.sh; rm /tmp/remote_kill.sh" >/dev/null 2>&1
+    # Use -T (no tty) instead of -tt when running from service (no terminal available)
+    sshpass -p "$PASSWORD" ssh -T -q $SSH_OPTS "$USER@$HOST" "sh /tmp/remote_kill.sh; rm /tmp/remote_kill.sh" >/dev/null 2>&1
   fi
 
   # Clean up the local temporary file.
