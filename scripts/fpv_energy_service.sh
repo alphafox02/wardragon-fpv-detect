@@ -60,7 +60,7 @@ cleanup() {
 trap cleanup EXIT
 
 if [ -x "${SERVICE_CTL}" ]; then
-  "${SERVICE_CTL}" stop
+  "${SERVICE_CTL}" stop || true
 fi
 
 start_guard
