@@ -34,6 +34,9 @@ for arg in "$@"; do
   esac
 done
 
+# Export so service_controller.sh can see it
+export FPV_DJI_GUARD_VERBOSE
+
 start_guard() {
   if [ "${FPV_DJI_GUARD}" != "1" ]; then
     return
