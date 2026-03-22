@@ -13,7 +13,7 @@
 # limitations under the License.
 
 [Unit]
-Description=FPV Receiver (WarDragon)
+Description=FPV Receiver - Dual SDR (WarDragon)
 After=network-online.target
 Wants=network-online.target
 
@@ -22,8 +22,10 @@ Type=simple
 User=dragon
 Group=dragon
 WorkingDirectory=/home/dragon/WarDragon/wardragon-fpv-detect
-Environment=FPV_DJI_GUARD=1
-Environment=FPV_DJI_GUARD_INTERVAL=30
+# DJI guard disabled: AntSDR runs DJI services undisturbed, Pluto handles energy scanning
+Environment=FPV_DJI_GUARD=0
+# Pluto URI for energy scanning (pluto.local or usb:X.Y.Z)
+Environment=FPV_PLUTO_URI=pluto.local
 ExecStart=/home/dragon/WarDragon/wardragon-fpv-detect/scripts/fpv_energy_service.sh -z --zmq-endpoint tcp://127.0.0.1:4226
 Restart=on-failure
 RestartSec=5

@@ -18,7 +18,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SERVICE_CTL="${ROOT_DIR}/scripts/service_controller.sh"
 SCAN_SCRIPT="${ROOT_DIR}/scripts/fpv_energy_scan.py"
-FPV_DJI_GUARD="${FPV_DJI_GUARD:-1}"
+FPV_DJI_GUARD="${FPV_DJI_GUARD:-0}"
 FPV_DJI_GUARD_INTERVAL="${FPV_DJI_GUARD_INTERVAL:-30}"
 FPV_OSMOSDR_ARGS="${FPV_OSMOSDR_ARGS:-}"
 FPV_PLUTO_URI="${FPV_PLUTO_URI:-}"
@@ -55,14 +55,14 @@ cleanup() {
   if [ -n "${guard_pid}" ]; then
     kill "${guard_pid}" 2>/dev/null || true
   fi
-  if [ -x "${SERVICE_CTL}" ]; then
+  if [ "${FPV_DJI_GUARD}" = "1" ] && [ -x "${SERVICE_CTL}" ]; then
     "${SERVICE_CTL}" start || true
   fi
 }
 
 trap cleanup EXIT
 
-if [ -x "${SERVICE_CTL}" ]; then
+if [ "${FPV_DJI_GUARD}" = "1" ] && [ -x "${SERVICE_CTL}" ]; then
   "${SERVICE_CTL}" stop || true
 fi
 

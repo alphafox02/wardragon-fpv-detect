@@ -53,7 +53,7 @@ RACE_BANDS_ALL_MHZ = [
 EXTRA_59_MHZ = [5935, 5940, 5943, 5950]
 ALL_CENTERS_MHZ = sorted(set(RACE_BANDS_ALL_MHZ + EXTRA_59_MHZ))
 
-PLUTO_URI = "ant.local"
+PLUTO_URI = "pluto.local"
 SAMP_RATE = 8e6
 BANDWIDTH = 8e6
 GAIN = 50
@@ -498,12 +498,7 @@ def main():
                     if pub is not None:
                         publish_alert(pub, confirm_hz, confirm_bw, 0.0, 0.0, None, "energy")
 
-                    # Confirm with suscli (release SDR first)
-                    tb.stop()
-                    tb.wait()
-                    tb = None
-                    gc.collect()
-                    time.sleep(COOLDOWN_S)
+                    # Confirm with suscli on AntSDR (separate device, no need to stop Pluto)
                     pal, ntsc, rssi = run_confirm(confirm_hz)
                     if pal is None or ntsc is None:
                         print(
@@ -529,14 +524,6 @@ def main():
                                 f"debug: confirm center={confirm_hz/1e6:.3f}MHz "
                                 f"bw={confirm_bw/1e6:.3f}MHz pal={pal:.1f} ntsc={ntsc:.1f}{rssi_str}"
                             )
-                    time.sleep(COOLDOWN_S)
-                    tb = start_tb_with_retry(
-                        threshold_db,
-                        source_args,
-                        args.samp_rate,
-                        args.bandwidth,
-                        args.gain,
-                    )
                 else:
                     print(f"center={mhz:.0f}MHz signals: none")
     except KeyboardInterrupt:
