@@ -461,41 +461,62 @@ def main():
     if args.osmosdr_args:
         source_args = args.osmosdr_args
     else:
-        source_args = f"soapy=driver=plutosdr,addr={args.pluto_uri}"
+        # Auto-detect: check for UHD device first, fall back to Pluto
+        uhd_found = False
+        try:
+            result = subprocess.run(
+                ["uhd_find_devices"],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                timeout=10,
+                check=False,
+            )
+            if result.returncode == 0 and "Device Address" in result.stdout:
+                source_args = "uhd"
+                uhd_found = True
+                print("UHD device found, using as scan SDR")
+        except FileNotFoundError:
+            pass
+        except Exception:
+            pass
 
-    # Wait for Pluto to be reachable before opening SDR, so SoapySDR
-    # doesn't auto-discover and grab a different device (e.g., the AntSDR).
-    # The Pluto may appear as pluto.local or fishball.local depending on firmware.
-    if not args.osmosdr_args and not args.pluto_uri.startswith("usb:"):
-        pluto_host = args.pluto_uri.replace("ip:", "")
-        alt_hosts = [pluto_host]
-        if pluto_host == "pluto.local":
-            alt_hosts.append("fishball.local")
-        elif pluto_host == "fishball.local":
-            alt_hosts.append("pluto.local")
+        if not uhd_found:
+            source_args = f"soapy=driver=plutosdr,addr={args.pluto_uri}"
 
-        print(f"Waiting for SDR ({', '.join(alt_hosts)})...")
-        resolved_host = None
-        for attempt in range(1, INITIAL_RETRIES + 1):
-            for host in alt_hosts:
-                try:
-                    socket.getaddrinfo(host, 80)
-                    resolved_host = host
-                    break
-                except socket.gaierror:
-                    continue
-            if resolved_host:
-                print(f"{resolved_host} resolved (attempt {attempt})")
-                if resolved_host != pluto_host:
-                    print(f"Using {resolved_host} instead of {pluto_host}")
-                    source_args = f"soapy=driver=plutosdr,addr={resolved_host}"
-                break
-            print(f"SDR not found (attempt {attempt}/{INITIAL_RETRIES})")
-            time.sleep(INITIAL_DELAY_S)
-        else:
-            raise RuntimeError(f"SDR not reachable after {INITIAL_RETRIES} attempts")
+            # Wait for Pluto to be reachable before opening SDR, so SoapySDR
+            # doesn't auto-discover and grab a different device (e.g., the AntSDR).
+            # The Pluto may appear as pluto.local or fishball.local depending on firmware.
+            if not args.pluto_uri.startswith("usb:"):
+                pluto_host = args.pluto_uri.replace("ip:", "")
+                alt_hosts = [pluto_host]
+                if pluto_host == "pluto.local":
+                    alt_hosts.append("fishball.local")
+                elif pluto_host == "fishball.local":
+                    alt_hosts.append("pluto.local")
 
-    print(f"Connecting to SDR at {args.pluto_uri}...")
+                print(f"Waiting for SDR ({', '.join(alt_hosts)})...")
+                resolved_host = None
+                for attempt in range(1, INITIAL_RETRIES + 1):
+                    for host in alt_hosts:
+                        try:
+                            socket.getaddrinfo(host, 80)
+                            resolved_host = host
+                            break
+                        except socket.gaierror:
+                            continue
+                    if resolved_host:
+                        print(f"{resolved_host} resolved (attempt {attempt})")
+                        if resolved_host != pluto_host:
+                            print(f"Using {resolved_host} instead of {pluto_host}")
+                            source_args = f"soapy=driver=plutosdr,addr={resolved_host}"
+                        break
+                    print(f"SDR not found (attempt {attempt}/{INITIAL_RETRIES})")
+                    time.sleep(INITIAL_DELAY_S)
+                else:
+                    raise RuntimeError(f"SDR not reachable after {INITIAL_RETRIES} attempts")
+
+    print(f"Connecting to SDR ({source_args})...")
     tb = None
     for attempt in range(1, INITIAL_RETRIES + 1):
         try:
