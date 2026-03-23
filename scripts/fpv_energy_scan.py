@@ -81,9 +81,9 @@ SUSCLI_DT = "0.1"
 SUSCLI_Q = "10"
 CONFIRM_SECONDS = 5
 CONFIRM_THRESHOLD = 60.0
-COOLDOWN_S = 3.0
-REOPEN_RETRIES = 15
-REOPEN_DELAY_S = 3.0
+COOLDOWN_S = 1.0
+REOPEN_RETRIES = 5
+REOPEN_DELAY_S = 2.0
 INITIAL_RETRIES = 30
 INITIAL_DELAY_S = 5.0
 
@@ -350,19 +350,14 @@ def run_confirm(center_hz):
 
 def start_tb_with_retry(threshold_db, source_args, samp_rate, bandwidth, gain):
     for attempt in range(1, REOPEN_RETRIES + 1):
+        tb = InspectorScan(threshold_db, source_args, samp_rate, bandwidth, gain)
         try:
-            tb = InspectorScan(threshold_db, source_args, samp_rate, bandwidth, gain)
             tb.start()
             return tb
         except RuntimeError as exc:
-            try:
-                tb.stop()
-                tb.wait()
-            except Exception:
-                pass
-            del tb
-            gc.collect()
-            print(f"warning: failed to open SDR (attempt {attempt}/{REOPEN_RETRIES}): {exc}")
+            tb.stop()
+            tb.wait()
+            print(f"warning: failed to open SDR (attempt {attempt}): {exc}")
             time.sleep(REOPEN_DELAY_S)
     raise RuntimeError("failed to reopen SDR after retries")
 
@@ -542,15 +537,12 @@ def main():
                     if pub is not None:
                         publish_alert(pub, confirm_hz, confirm_bw, 0.0, 0.0, None, "energy")
 
-                    # Pause Pluto scan while suscli confirms on AntSDR.
-                    # suscli device enumeration disrupts the Pluto IIO context.
+                    # Confirm with suscli (release SDR first)
                     tb.stop()
                     tb.wait()
-                    del tb
                     tb = None
                     gc.collect()
                     time.sleep(COOLDOWN_S)
-
                     pal, ntsc, rssi = run_confirm(confirm_hz)
                     if pal is None or ntsc is None:
                         print(
@@ -577,7 +569,6 @@ def main():
                                 f"bw={confirm_bw/1e6:.3f}MHz pal={pal:.1f} ntsc={ntsc:.1f}{rssi_str}"
                             )
 
-                    # Restart Pluto scan
                     time.sleep(COOLDOWN_S)
                     tb = start_tb_with_retry(
                         threshold_db,
