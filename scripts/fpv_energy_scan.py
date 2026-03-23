@@ -17,6 +17,7 @@ import argparse
 import gc
 import json
 import os
+import socket
 import statistics
 import subprocess
 import time
@@ -83,6 +84,8 @@ CONFIRM_THRESHOLD = 60.0
 COOLDOWN_S = 1.0
 REOPEN_RETRIES = 5
 REOPEN_DELAY_S = 2.0
+INITIAL_RETRIES = 30
+INITIAL_DELAY_S = 5.0
 
 # ZMQ publish settings (XPUB)
 FPV_ZMQ_ENDPOINT = os.getenv("FPV_ZMQ_ENDPOINT", "tcp://127.0.0.1:4226")
@@ -460,8 +463,39 @@ def main():
     else:
         source_args = f"soapy=driver=plutosdr,addr={args.pluto_uri}"
 
-    tb = InspectorScan(threshold_db, source_args, args.samp_rate, args.bandwidth, args.gain)
-    tb.start()
+    # Wait for Pluto to be reachable before opening SDR, so SoapySDR
+    # doesn't auto-discover and grab a different device (e.g., the AntSDR).
+    if not args.osmosdr_args and not args.pluto_uri.startswith("usb:"):
+        pluto_host = args.pluto_uri.replace("ip:", "")
+        print(f"Waiting for {pluto_host} to be reachable...")
+        for attempt in range(1, INITIAL_RETRIES + 1):
+            try:
+                socket.getaddrinfo(pluto_host, 80)
+                print(f"{pluto_host} resolved (attempt {attempt})")
+                break
+            except socket.gaierror:
+                print(f"{pluto_host} not found (attempt {attempt}/{INITIAL_RETRIES})")
+                time.sleep(INITIAL_DELAY_S)
+        else:
+            raise RuntimeError(f"{pluto_host} not reachable after {INITIAL_RETRIES} attempts")
+
+    print(f"Connecting to SDR at {args.pluto_uri}...")
+    tb = None
+    for attempt in range(1, INITIAL_RETRIES + 1):
+        try:
+            tb = InspectorScan(threshold_db, source_args, args.samp_rate, args.bandwidth, args.gain)
+            tb.start()
+            print(f"SDR connected (attempt {attempt})")
+            break
+        except RuntimeError as exc:
+            if tb is not None:
+                tb.stop()
+                tb.wait()
+                tb = None
+            print(f"SDR not ready (attempt {attempt}/{INITIAL_RETRIES}): {exc}")
+            time.sleep(INITIAL_DELAY_S)
+    if tb is None:
+        raise RuntimeError(f"SDR at {args.pluto_uri} not available after {INITIAL_RETRIES} attempts")
     if WARMUP_SWEEPS > 0 and not AUTO_THRESHOLD:
         threshold_db = warmup_threshold(tb)
         if args.debug:
