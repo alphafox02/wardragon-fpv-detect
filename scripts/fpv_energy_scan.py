@@ -55,6 +55,7 @@ EXTRA_59_MHZ = [5935, 5940, 5943, 5950]
 ALL_CENTERS_MHZ = sorted(set(RACE_BANDS_ALL_MHZ + EXTRA_59_MHZ))
 
 PLUTO_URI = "pluto.local"
+SERVICE_CTL = os.path.join(os.path.dirname(os.path.abspath(__file__)), "service_controller.sh")
 SAMP_RATE = 8e6
 BANDWIDTH = 8e6
 GAIN = 50
@@ -275,6 +276,22 @@ def publish_alert(pub_socket, center_hz, bandwidth_hz, pal, ntsc, rssi, source):
     message_list = build_alert_messages(center_hz, bandwidth_hz, pal, ntsc, rssi, source)
     try:
         pub_socket.send_string(json.dumps(message_list))
+    except Exception:
+        pass
+
+
+def _service_ctl(action):
+    """Run service_controller.sh stop/start to release/restore AntSDR."""
+    if not os.path.isfile(SERVICE_CTL) or not os.access(SERVICE_CTL, os.X_OK):
+        return
+    try:
+        subprocess.run(
+            [SERVICE_CTL, action],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            timeout=30,
+            check=False,
+        )
     except Exception:
         pass
 
@@ -574,13 +591,15 @@ def main():
                     if pub is not None:
                         publish_alert(pub, confirm_hz, confirm_bw, 0.0, 0.0, None, "energy")
 
-                    # Confirm with suscli (release SDR first)
+                    # Confirm with suscli (release scan SDR, stop DJI on AntSDR)
                     tb.stop()
                     tb.wait()
                     tb = None
                     gc.collect()
                     time.sleep(COOLDOWN_S)
+                    _service_ctl("stop")
                     pal, ntsc, rssi = run_confirm(confirm_hz)
+                    _service_ctl("start")
                     if pal is None or ntsc is None:
                         print(
                             f"confirm center={confirm_hz/1e6:.3f}MHz skipped (suscli unavailable)"
