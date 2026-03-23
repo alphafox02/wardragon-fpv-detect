@@ -280,20 +280,29 @@ def publish_alert(pub_socket, center_hz, bandwidth_hz, pal, ntsc, rssi, source):
         pass
 
 
-def _service_ctl(action):
+def _service_ctl(action, debug=False):
     """Run service_controller.sh stop/start to release/restore AntSDR."""
     if not os.path.isfile(SERVICE_CTL) or not os.access(SERVICE_CTL, os.X_OK):
+        if debug:
+            print(f"debug: service_controller.sh not found or not executable")
         return
+    if debug:
+        print(f"debug: DJI service {action}...")
     try:
+        env = os.environ.copy()
+        if debug:
+            env["FPV_DJI_GUARD_VERBOSE"] = "1"
         subprocess.run(
             [SERVICE_CTL, action],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
+            stdout=None if debug else subprocess.DEVNULL,
+            stderr=None if debug else subprocess.DEVNULL,
+            env=env,
             timeout=30,
             check=False,
         )
-    except Exception:
-        pass
+    except Exception as exc:
+        if debug:
+            print(f"debug: service_controller.sh {action} failed: {exc}")
 
 
 def run_confirm(center_hz):
@@ -597,9 +606,9 @@ def main():
                     tb = None
                     gc.collect()
                     time.sleep(COOLDOWN_S)
-                    _service_ctl("stop")
+                    _service_ctl("stop", debug=args.debug)
                     pal, ntsc, rssi = run_confirm(confirm_hz)
-                    _service_ctl("start")
+                    _service_ctl("start", debug=args.debug)
                     if pal is None or ntsc is None:
                         print(
                             f"confirm center={confirm_hz/1e6:.3f}MHz skipped (suscli unavailable)"
