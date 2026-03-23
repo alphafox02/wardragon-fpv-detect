@@ -465,19 +465,35 @@ def main():
 
     # Wait for Pluto to be reachable before opening SDR, so SoapySDR
     # doesn't auto-discover and grab a different device (e.g., the AntSDR).
+    # The Pluto may appear as pluto.local or fishball.local depending on firmware.
     if not args.osmosdr_args and not args.pluto_uri.startswith("usb:"):
         pluto_host = args.pluto_uri.replace("ip:", "")
-        print(f"Waiting for {pluto_host} to be reachable...")
+        alt_hosts = [pluto_host]
+        if pluto_host == "pluto.local":
+            alt_hosts.append("fishball.local")
+        elif pluto_host == "fishball.local":
+            alt_hosts.append("pluto.local")
+
+        print(f"Waiting for SDR ({', '.join(alt_hosts)})...")
+        resolved_host = None
         for attempt in range(1, INITIAL_RETRIES + 1):
-            try:
-                socket.getaddrinfo(pluto_host, 80)
-                print(f"{pluto_host} resolved (attempt {attempt})")
+            for host in alt_hosts:
+                try:
+                    socket.getaddrinfo(host, 80)
+                    resolved_host = host
+                    break
+                except socket.gaierror:
+                    continue
+            if resolved_host:
+                print(f"{resolved_host} resolved (attempt {attempt})")
+                if resolved_host != pluto_host:
+                    print(f"Using {resolved_host} instead of {pluto_host}")
+                    source_args = f"soapy=driver=plutosdr,addr={resolved_host}"
                 break
-            except socket.gaierror:
-                print(f"{pluto_host} not found (attempt {attempt}/{INITIAL_RETRIES})")
-                time.sleep(INITIAL_DELAY_S)
+            print(f"SDR not found (attempt {attempt}/{INITIAL_RETRIES})")
+            time.sleep(INITIAL_DELAY_S)
         else:
-            raise RuntimeError(f"{pluto_host} not reachable after {INITIAL_RETRIES} attempts")
+            raise RuntimeError(f"SDR not reachable after {INITIAL_RETRIES} attempts")
 
     print(f"Connecting to SDR at {args.pluto_uri}...")
     tb = None
