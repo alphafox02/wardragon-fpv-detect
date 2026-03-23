@@ -350,14 +350,19 @@ def run_confirm(center_hz):
 
 def start_tb_with_retry(threshold_db, source_args, samp_rate, bandwidth, gain):
     for attempt in range(1, REOPEN_RETRIES + 1):
-        tb = InspectorScan(threshold_db, source_args, samp_rate, bandwidth, gain)
         try:
+            tb = InspectorScan(threshold_db, source_args, samp_rate, bandwidth, gain)
             tb.start()
             return tb
         except RuntimeError as exc:
-            tb.stop()
-            tb.wait()
-            print(f"warning: failed to open SDR (attempt {attempt}): {exc}")
+            try:
+                tb.stop()
+                tb.wait()
+            except Exception:
+                pass
+            del tb
+            gc.collect()
+            print(f"warning: failed to open SDR (attempt {attempt}/{REOPEN_RETRIES}): {exc}")
             time.sleep(REOPEN_DELAY_S)
     raise RuntimeError("failed to reopen SDR after retries")
 
@@ -489,9 +494,14 @@ def main():
             break
         except RuntimeError as exc:
             if tb is not None:
-                tb.stop()
-                tb.wait()
+                try:
+                    tb.stop()
+                    tb.wait()
+                except Exception:
+                    pass
+                del tb
                 tb = None
+                gc.collect()
             print(f"SDR not ready (attempt {attempt}/{INITIAL_RETRIES}): {exc}")
             time.sleep(INITIAL_DELAY_S)
     if tb is None:
