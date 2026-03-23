@@ -542,7 +542,15 @@ def main():
                     if pub is not None:
                         publish_alert(pub, confirm_hz, confirm_bw, 0.0, 0.0, None, "energy")
 
-                    # Confirm with suscli on AntSDR (separate device, no need to stop Pluto)
+                    # Pause Pluto scan while suscli confirms on AntSDR.
+                    # suscli device enumeration disrupts the Pluto IIO context.
+                    tb.stop()
+                    tb.wait()
+                    del tb
+                    tb = None
+                    gc.collect()
+                    time.sleep(COOLDOWN_S)
+
                     pal, ntsc, rssi = run_confirm(confirm_hz)
                     if pal is None or ntsc is None:
                         print(
@@ -568,6 +576,16 @@ def main():
                                 f"debug: confirm center={confirm_hz/1e6:.3f}MHz "
                                 f"bw={confirm_bw/1e6:.3f}MHz pal={pal:.1f} ntsc={ntsc:.1f}{rssi_str}"
                             )
+
+                    # Restart Pluto scan
+                    time.sleep(COOLDOWN_S)
+                    tb = start_tb_with_retry(
+                        threshold_db,
+                        source_args,
+                        args.samp_rate,
+                        args.bandwidth,
+                        args.gain,
+                    )
                 else:
                     print(f"center={mhz:.0f}MHz signals: none")
     except KeyboardInterrupt:
