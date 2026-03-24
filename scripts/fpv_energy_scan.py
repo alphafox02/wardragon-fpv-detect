@@ -606,9 +606,7 @@ def main():
                     tb = None
                     gc.collect()
                     time.sleep(COOLDOWN_S)
-                    _service_ctl("stop", debug=args.debug)
                     pal, ntsc, rssi = run_confirm(confirm_hz)
-                    _service_ctl("start", debug=args.debug)
                     if pal is None or ntsc is None:
                         print(
                             f"confirm center={confirm_hz/1e6:.3f}MHz skipped (suscli unavailable)"
